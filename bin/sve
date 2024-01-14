@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+
+import argparse
+import ast
+from loguru import logger
+from typing import List, Tuple
+
+from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+from moviepy.editor import VideoFileClip, concatenate_videoclips
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("video_file")
+    sub_parsers = parser.add_subparsers(
+        title="commands", help="Available commands and operations"
+    )
+
+    # SPLIT VIDEO
+    split_video_parser = sub_parsers.add_parser(
+        "split_video", help="Split video in chunks of equal length with set overlap"
+    )
+    split_video_parser.add_argument(
+        "--length",
+        default=720,
+        type=int,
+        help="Chunk size (in secs) to split video into",
+    )
+    split_video_parser.add_argument(
+        "--overlap", default=5, type=int, help="Overlap time (in secs) between chunks"
+    )
+    split_video_parser.set_defaults(func=split_video)
+
+    # SCALE VOLUME
+    scale_volume_parser = sub_parsers.add_parser(
+        "scale_volume", help="Scale all volume"
+    )
+    scale_volume_parser.add_argument(
+        "--scale-factor",
+        default=1.0,
+        type=float,
+        help="Scale factor, 2 will double the volume while 0.5 will halve it",
+    )
+    scale_volume_parser.add_argument(
+        "--output-file", required=False, help="Scaled output file name"
+    )
+    scale_volume_parser.set_defaults(func=scale_volume)
+
+    # CUTOUT
+    cutout_parser = sub_parsers.add_parser("cutout", help="Cut segments out")
+    cutout_parser.add_argument(
+        "--segments",
+        required=True,
+        help="""
+        List of tuples containing the (start, stop) times to cut out. Resulting clips are concatenated\n
+        e.g - [(10, 20), (70, 80)] to cut out from 10s - 20s and from 70s - 80s
+        """,
+    )
+    cutout_parser.add_argument("--output-file", required=False, help="Cut video output")
+    cutout_parser.set_defaults(func=cutout)
+
+    # SUBCLIP
+    subclip_parser = sub_parsers.add_parser("subclip", help="Subclip segments")
+    subclip_parser.add_argument(
+        "--segments",
+        required=True,
+        help="""
+        List of tuples containing the (start, stop) times to subclip. Resulting clips are concatenated\n
+        e.g - [(10, 20), (70, 80)] to subclip out from 10s - 20s and from 70s - 80s
+        """,
+    )
+    subclip_parser.add_argument(
+        "--output-file", required=False, help="subclip video output"
+    )
+    subclip_parser.set_defaults(func=subclip)
+
+    return parser.parse_args()
+
+
+def split_video(video_file: str, stride: int, overlap: int):
+    video = VideoFileClip(video_file)
+    video_duration = video.duration
+    n_chunks = int(video_duration // stride + 1)
+
+    logger.info(f"Split video: {video_file}")
+    logger.info(
+        f"Duration: {video_duration}. Splitting into {n_chunks} chunks of {stride} seconds with {stride} seconds overlap"
+    )
+
+    starts = [(i * stride) - overlap for i in range(n_chunks)]
+
+    target_video_file = video_file.replace(".mp4", "_{}.mp4")
+    for i, start in enumerate(starts):
+        ffmpeg_extract_subclip(
+            video_file,
+            start,
+            start + stride,
+            targetname=target_video_file.format(i),
+        )
+
+
+def scale_volume(video_file: str, scale_factor: float, output_file: str = None):
+    video = VideoFileClip(video_file)
+    video = video.volumex(scale_factor)
+    logger.info(f"Scaling: {video_file} audio by factor: {scale_factor}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", f"_scaled_{scale_factor}.mp4")
+    video.write_videofile(output_file)
+
+
+def cutout(video_file: str, segments: str, output_file: str = None):
+    segments: List[Tuple] = ast.literal_eval(segments)
+
+    video = VideoFileClip(video_file)
+    logger.info(f"Cutting out segments: {segments}")
+    for start, stop in segments:
+        logger.info((start, stop))
+        video = video.cutout(start, stop)
+
+    logger.info(f"Resulting video duration: {video.duration}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", "_cutout.mp4")
+    video.write_videofile(output_file)
+
+
+def subclip(video_file: str, segments: str, output_file: str = None):
+    segments: List[Tuple] = ast.literal_eval(segments)
+
+    video = VideoFileClip(video_file)
+    logger.info(f"Subclipping segments: {segments}")
+    clips = []
+    for start, stop in segments:
+        logger.info((start, stop))
+        clip = video.subclip(start, stop)
+        clips.append(clip)
+
+    video_out = concatenate_videoclips(clips)
+    logger.info(f"Resulting video duration: {video_out.duration}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", "_subclip.mp4")
+    video_out.write_videofile(output_file)
+
+
+if __name__ == "__main__":
+    args = vars(parse_args())
+    print(args)
+    func = args.pop("func")
+    func(**args)
