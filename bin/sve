@@ -100,13 +100,14 @@ def cutout(video_file: str, segments: str, output_file: str = None):
 
     video = VideoFileClip(video_file)
     logger.info(f"Cutting out segments: {segments}")
-    for segment in segments:
-        clip = video.cutout(segment)
+    for start, stop in segments:
+        logger.info((start, stop))
+        video = video.cutout(start, stop)
 
-    logger.info(f"Resulting video duration: {clip.duration}")
+    logger.info(f"Resulting video duration: {video.duration}")
     if not output_file:
         output_file = video_file.replace(".mp4", "_cutout.mp4")
-    clip.write_videofile(output_file)
+    video.write_videofile(output_file)
 
 
 if __name__ == "__main__":
