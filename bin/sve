@@ -89,21 +89,24 @@ def split_video(video_file: str, stride: int, overlap: int):
 def scale_volume(video_file: str, scale_factor: float, output_file: str = None):
     video = VideoFileClip(video_file)
     video = video.volumex(scale_factor)
-    if not output_file:
-        output_file = f"scaled_{scale_factor}_{video_file}"
     logger.info(f"Scaling: {video_file} audio by factor: {scale_factor}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", f"_scaled_{scale_factor}.mp4")
     video.write_videofile(output_file)
 
 
 def cutout(video_file: str, segments: str, output_file: str = None):
     segments: List[Tuple] = ast.literal_eval(segments)
-    print(segments)
-    print(type(segments))
-    print(type(segments[0][0]))
 
     video = VideoFileClip(video_file)
+    logger.info(f"Cutting out segments: {segments}")
     for segment in segments:
         clip = video.cutout(segment)
+
+    logger.info(f"Resulting video duration: {clip.duration}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", "_cutout.mp4")
+    clip.write_videofile(output_file)
 
 
 if __name__ == "__main__":
