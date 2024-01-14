@@ -6,7 +6,7 @@ from loguru import logger
 from typing import List, Tuple
 
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from moviepy.editor import VideoFileClip
+from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 
 def parse_args():
@@ -49,7 +49,7 @@ def parse_args():
     scale_volume_parser.set_defaults(func=scale_volume)
 
     # CUTOUT
-    cutout_parser = sub_parsers.add_parser("cut", help="Cut segments out")
+    cutout_parser = sub_parsers.add_parser("cutout", help="Cut segments out")
     cutout_parser.add_argument(
         "--segments",
         required=True,
@@ -60,6 +60,21 @@ def parse_args():
     )
     cutout_parser.add_argument("--output-file", required=False, help="Cut video output")
     cutout_parser.set_defaults(func=cutout)
+
+    # SUBCLIP
+    subclip_parser = sub_parsers.add_parser("subclip", help="Subclip segments")
+    subclip_parser.add_argument(
+        "--segments",
+        required=True,
+        help="""
+        List of tuples containing the (start, stop) times to subclip. Resulting clips are concatenated\n
+        e.g - [(10, 20), (70, 80)] to subclip out from 10s - 20s and from 70s - 80s
+        """,
+    )
+    subclip_parser.add_argument(
+        "--output-file", required=False, help="subclip video output"
+    )
+    subclip_parser.set_defaults(func=subclip)
 
     return parser.parse_args()
 
@@ -108,6 +123,24 @@ def cutout(video_file: str, segments: str, output_file: str = None):
     if not output_file:
         output_file = video_file.replace(".mp4", "_cutout.mp4")
     video.write_videofile(output_file)
+
+
+def subclip(video_file: str, segments: str, output_file: str = None):
+    segments: List[Tuple] = ast.literal_eval(segments)
+
+    video = VideoFileClip(video_file)
+    logger.info(f"Subclipping segments: {segments}")
+    clips = []
+    for start, stop in segments:
+        logger.info((start, stop))
+        clip = video.subclip(start, stop)
+        clips.append(clip)
+
+    video_out = concatenate_videoclips(clips)
+    logger.info(f"Resulting video duration: {video_out.duration}")
+    if not output_file:
+        output_file = video_file.replace(".mp4", "_subclip.mp4")
+    video_out.write_videofile(output_file)
 
 
 if __name__ == "__main__":
