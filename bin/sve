@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
+import ast
 from loguru import logger
+from typing import List, Tuple
 
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip
-from moviepy.audio.fx.all import volumex
 
 
 def parse_args():
@@ -47,6 +48,19 @@ def parse_args():
     )
     scale_volume_parser.set_defaults(func=scale_volume)
 
+    # CUTOUT
+    cutout_parser = sub_parsers.add_parser("cut", help="Cut segments out")
+    cutout_parser.add_argument(
+        "--segments",
+        required=True,
+        help="""
+        List of tuples containing the (start, stop) times to cut out. Resulting clips are concatenated\n
+        e.g - [(10, 20), (70, 80)] to cut out from 10s - 20s and from 70s - 80s
+        """,
+    )
+    cutout_parser.add_argument("--output-file", required=False, help="Cut video output")
+    cutout_parser.set_defaults(func=cutout)
+
     return parser.parse_args()
 
 
@@ -54,9 +68,6 @@ def split_video(video_file: str, stride: int, overlap: int):
     video = VideoFileClip(video_file)
     video_duration = video.duration
     n_chunks = int(video_duration // stride + 1)
-
-    print(video_duration)
-    print(n_chunks)
 
     logger.info(f"Split video: {video_file}")
     logger.info(
@@ -80,7 +91,19 @@ def scale_volume(video_file: str, scale_factor: float, output_file: str = None):
     video = video.volumex(scale_factor)
     if not output_file:
         output_file = f"scaled_{scale_factor}_{video_file}"
+    logger.info(f"Scaling: {video_file} audio by factor: {scale_factor}")
     video.write_videofile(output_file)
+
+
+def cutout(video_file: str, segments: str, output_file: str = None):
+    segments: List[Tuple] = ast.literal_eval(segments)
+    print(segments)
+    print(type(segments))
+    print(type(segments[0][0]))
+
+    video = VideoFileClip(video_file)
+    for segment in segments:
+        clip = video.cutout(segment)
 
 
 if __name__ == "__main__":
