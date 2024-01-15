@@ -8,12 +8,14 @@ from typing import List, Tuple
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip, concatenate_videoclips
 
+from sve import animate_text
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("video_file")
+
     sub_parsers = parser.add_subparsers(
         title="commands", help="Available commands and operations"
     )
@@ -22,6 +24,7 @@ def parse_args():
     split_video_parser = sub_parsers.add_parser(
         "split_video", help="Split video in chunks of equal length with set overlap"
     )
+    split_video_parser.add_argument("video_file")
     split_video_parser.add_argument(
         "--length",
         default=720,
@@ -37,6 +40,7 @@ def parse_args():
     scale_volume_parser = sub_parsers.add_parser(
         "scale_volume", help="Scale all volume"
     )
+    scale_volume_parser.add_argument("video_file")
     scale_volume_parser.add_argument(
         "--scale-factor",
         default=1.0,
@@ -50,6 +54,7 @@ def parse_args():
 
     # CUTOUT
     cutout_parser = sub_parsers.add_parser("cutout", help="Cut segments out")
+    cutout_parser.add_argument("video_file")
     cutout_parser.add_argument(
         "--segments",
         required=True,
@@ -63,6 +68,7 @@ def parse_args():
 
     # SUBCLIP
     subclip_parser = sub_parsers.add_parser("subclip", help="Subclip segments")
+    subclip_parser.add_argument("video_file")
     subclip_parser.add_argument(
         "--segments",
         required=True,
@@ -75,6 +81,20 @@ def parse_args():
         "--output-file", required=False, help="subclip video output"
     )
     subclip_parser.set_defaults(func=subclip)
+
+    # ANIMATE TEXT
+    animate_text_parser = sub_parsers.add_parser(
+        "animate_text", help="Animate text into clip"
+    )
+    animate_text_parser.add_argument("--text", help="Text to animate")
+    animate_text_parser.add_argument(
+        "--animation",
+        choices=["vortex", "vortexout", "cascade", "arrive"],
+        default="vortex",
+        help="Animation method",
+    )
+    animate_text_parser.add_argument("--output-file", help="animated text video output")
+    animate_text_parser.set_defaults(func=animate_text.animate_text)
 
     return parser.parse_args()
 
@@ -115,7 +135,8 @@ def cutout(video_file: str, segments: str, output_file: str = None):
 
     video = VideoFileClip(video_file)
     logger.info(f"Cutting out segments: {segments}")
-    for start, stop in segments:
+    sorted_segments = sorted(segments, key=lambda x: x[0], reverse=True)
+    for start, stop in sorted_segments:
         logger.info((start, stop))
         video = video.cutout(start, stop)
 
