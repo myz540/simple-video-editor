@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 from moviepy.editor import VideoFileClip, concatenate_videoclips
+from moviepy.audio.fx import multiply_volume
 
 from sve import animate_text
 
@@ -123,7 +124,7 @@ def split_video(video_file: str, stride: int, overlap: int):
 
 def scale_volume(video_file: str, scale_factor: float, output_file: str = None):
     video = VideoFileClip(video_file)
-    video = video.volumex(scale_factor)
+    video = multiply_volume(video, factor=scale_factor)
     logger.info(f"Scaling: {video_file} audio by factor: {scale_factor}")
     if not output_file:
         output_file = video_file.replace(".mp4", f"_scaled_{scale_factor}.mp4")
